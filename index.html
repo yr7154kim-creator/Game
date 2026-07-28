@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>초보자 맞춤형 2인용 & AI 바둑 교실</title>
+  <style>
+    :root {
+      --board-color: #e4ab65;
+      --bg-color: #f5f6fa;
+      --primary-color: #2c3e50;
+      --accent-color: #e67e22;
+      --hint-color: #f1c40f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+      text-align: center;
+      background: var(--bg-color);
+      margin: 0;
+      padding: 10px;
+      color: #333;
+    }
+    header {
+      margin-bottom: 10px;
+    }
+    h1 { margin: 5px 0; font-size: 22px; color: var(--primary-color); }
+   
+    /* 모드 선택 탭 */
+    .mode-selector {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .mode-btn {
+      padding: 8px 14px;
+      border: 2px solid #ccc;
+      border-radius: 20px;
+      background: #fff;
+      font-weight: bold;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .mode-btn.active {
+      background: var(--primary-color);
+      color: #fff;
+      border-color: var(--primary-color);
+    }
+
+    /* 패널 및 상태 */
+    .panel {
+      background: #fff;
+      padding: 10px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      max-width: 420px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .online-controls { display: flex; justify-content: center; gap: 5px; margin-bottom: 8px; }
+    input[type="text"] { padding: 6px 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; width: 140px; }
+    button.action-btn {
+      padding: 6px 12px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    #status-bar {
+      font-size: 14px;
+      font-weight: 600;
+      margin: 5px 0;
+      min-height: 20px;
+    }
+    #score-board {
+      display: flex;
+      justify-content: space-around;
+      font-size: 13px;
+      background: #f8f9fa;
+      padding: 6px;
+      border-radius: 6px;
+    }
+
+    /* 바둑판 테두리 */
+    #board-wrapper {
+      display: inline-block;
+      position: relative;
+      background: var(--board-color);
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+      touch-action: manipulation;
+    }
+    canvas { background: var(--board-color); cursor: pointer; display: block; }
+
+    /* 가이드 메시지 및 힌트 */
+    #hint-box {
+      margin-top: 8px;
+      background: #fffde7;
+      border: 1px solid #ffe082;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #795548;
+      max-width: 420px;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: left;
+    }
+
+    /* 하단 버튼 및 가이드 레전드 */
+    .controls-bottom {
+      margin-top: 10px;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .sub-btn {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: none;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .hint-toggle { background: #f39c12; color: white; }
+    .learn-btn { background: #2ecc71; color: white; }
+    .reset-btn { background: #e74c3c; color: white; }
+
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: #666;
+    }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; }
+
+    /* 모달 팝업 (바둑 노하우 학습) */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: white;
+      width: 90%;
+      max-width: 400px;
+      max-height: 80vh;
+      border-radius: 12px;
+      padding: 20px;
+      overflow-y: auto;
+      text-align: left;
+    }
+    .modal h2 { margin-top: 0; color: var(--primary-color); font-size: 18px; border-bottom: 2px solid #eee; padding-bottom: 8px; }
+    .lesson-item { margin-bottom: 12px; }
+    .lesson-item h4 { margin: 0 0 4px 0; color: #d35400; font-size: 14px; }
+    .lesson-item p { margin: 0; font-size: 12px; color: #555; line-height: 1.5; }
+    .close-btn { width: 100%; padding: 10px; background: var(--primary-color); color: white; border: none; border-radius: 6px; font-weight: bold; margin-top: 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>📱 스마트 바둑 교실 & 대진</h1>
+  </header>
+
+  <!-- 게임 모드 선택 -->
+  <div class="mode-selector">
+    <button class="mode-btn active" id="btn-ai" onclick="switchMode('ai')">🤖 컴퓨터 대결</button>
+    <button class="mode-btn" id="btn-pvp" onclick="switchMode('pvp')">👥 1:1 온라인 대결</button>
+  </div>
+
+  <div class="panel">
+    <!-- 온라인 접속용 UI (PVP 모드 시 노출) -->
+    <div id="pvp-controls" class="online-controls" style="display: none;">
+      <input type="text" id="roomId" placeholder="방 이름 (예: love123)">
+      <button class="action-btn" onclick="joinGame()">방 접속</button>
+    </div>
+
+    <div id="status-bar">모드를 선택하고 게임을 시작하세요.</div>
+    <div id="score-board">
+      <span>흑(●) 사석: <b id="cap-b">0</b> | 집: <b id="territory-b">0</b></span>
+      <span>백(○) 사석: <b id="cap-w">0</b> | 집: <b id="territory-w">0</b></span>
+    </div>
+  </div>
+
+  <!-- 바둑판 -->
+  <div id="board-wrapper">
+    <canvas id="goBoard" width="340" height="340"></canvas>
+  </div>
+
+  <!-- 범례 -->
+  <div class="legend">
+    <span><span class="dot" style="background: rgba(0,200,0,0.8);"></span> 착수 가능</span>
+    <span><span class="dot" style="background: rgba(255,0,0,0.6);"></span> 착수 금지</span>
+    <span><span class="dot" style="background: #f1c40f;"></span> AI 추천 수</span>
+  </div>
+
+  <!-- 힌트 안내 박스 -->
+  <div id="hint-box">
+    💡 <b>AI 코치 팁:</b> [힌트 켜기]를 누르면 좋은 착수 위치와 바둑 노하우를 안내해 드립니다!
+  </div>
+
+  <!-- 기능 버튼 -->
+  <div class="controls-bottom">
+    <button class="sub-btn hint-toggle" onclick="toggleHint()">💡 힌트 켜기/끄기</button>
+    <button class="sub-btn learn-btn" onclick="openModal()">📚 바둑 비법 배우기</button>
+    <button class="sub-btn reset-btn" onclick="resetGame()">🔄 새 게임</button>
+  </div>
+
+  <!-- 초보자 바둑 노하우 모달 -->
+  <div class="modal" id="lessonModal">
+    <div class="modal-content">
+      <h2>🎓 초보자를 위한 바둑 핵심 노하우</h2>
+     
+      <div class="lesson-item">
+        <h4>1. 집 짓기 우선순위 (귀 ➔ 변 ➔ 중앙)</h4>
+        <p>바둑은 땅(집)을 넓게 만드는 사람이 이깁니다. 구석(귀)은 돌 4개만 써도 집을 쉽게 만들지만, 중앙은 돌이 8개 이상 필요합니다. **모서리부터 먼저 차지하세요!**</p>
+      </div>
+
+      <div class="lesson-item">
+        <h4>2. 활로(길)와 단수</h4>
+        <p>돌의 상하좌우 선을 '활로'라고 합니다. 상대가 내 활로를 모두 막으면 돌이 잡힙니다. 활로가 딱 1개 남은 상태를 **'단수'**라고 하며, 이 때는 즉시 도망쳐야 합니다!</p>
+      </div>
+
+      <div class="lesson-item">
+        <h4>3. 두 눈(Eye) 만들어서 살기</h4>
+        <p>상대방이 절대 들어올 수 없는 완전한 내 독립 공간 2개(두 눈)를 만들면 그 돌은 절대로 잡히지 않는 **'불사의 돌'**이 됩니다.</p>
+      </div>
+
+      <div class="lesson-item">
+        <h4>4. 연결과 끊기</h4>
+        <p>내 돌들이 튼튼하게 일직선으로 연결되어 있으면 강해지고, 흩어지면 약해집니다. 상대 돌의 연결 부위를 끊거나 내 돌을 튼튼히 연결하는 것이 승리의 열쇠입니다.</p>
+      </div>
+
+      <button class="close-btn" onclick="closeModal()">이해했습니다! (닫기)</button>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+  <script>
+    // Firebase 공용 DB 설정
+    const firebaseConfig = { databaseURL: "https://goban-online-default-rtdb.firebaseio.com/" };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const SIZE = 9; // 초보용 9x9 판
+    const CELL_SIZE = 34;
+    const PADDING = 17;
+
+    let canvas = document.getElementById("goBoard");
+    let ctx = canvas.getContext("2d");
+
+    let mode = 'ai'; // 'ai' 또는 'pvp'
+    let showHint = true;
+    let roomId = "";
+    let myColor = 'B'; // 'B': 흑, 'W': 백
+    let bestMove = null;
+    let hintMessage = "";
+
+    let gameState = {
+      board: Array(SIZE).fill(null).map(() => Array(SIZE).fill(null)),
+      turn: 'B',
+      capturedB: 0,
+      capturedW: 0
+    };
+
+    // 초기화
+    function init() {
+      drawBoard();
+      updateUI();
+      if(mode === 'ai' && gameState.turn === myColor && showHint) {
+        calculateBestMove('B');
+      }
+    }
+
+    function switchMode(newMode) {
+      mode = newMode;
+      document.getElementById('btn-ai').classList.toggle('active', mode === 'ai');
+      document.getElementById('btn-pvp').classList.toggle('active', mode === 'pvp');
+      document.getElementById('pvp-controls').style.display = mode === 'pvp' ? 'flex' : 'none';
+      resetGame();
+    }
+
+    function toggleHint() {
+      showHint = !showHint;
+      if (showHint) {
+        calculateBestMove(gameState.turn);
+      } else {
+        bestMove = null;
+        document.getElementById("hint-box").innerHTML = "💡 힌트 기능이 꺼졌습니다.";
+      }
+      drawBoard();
+    }
+
+    function resetGame() {
+      gameState = {
+        board: Array(SIZE).fill(null).map(() => Array(SIZE).fill(null)),
+        turn: 'B',
+        capturedB: 0,
+        capturedW: 0
+      };
+      myColor = 'B';
+      bestMove = null;
+      if(showHint) calculateBestMove('B');
+      drawBoard();
+      updateUI();
+    }
+
+    // 바둑판 그리기
+    function drawBoard() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+     
+      // 격자
+      ctx.strokeStyle = "#444";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < SIZE; i++) {
+        ctx.beginPath();
+        ctx.moveTo(PADDING, PADDING + i * CELL_SIZE);
+        ctx.lineTo(PADDING + (SIZE - 1) * CELL_SIZE, PADDING + i * CELL_SIZE);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(PADDING + i * CELL_SIZE, PADDING);
+        ctx.lineTo(PADDING + i * CELL_SIZE, PADDING + (SIZE - 1) * CELL_SIZE);
+        ctx.stroke();
+      }
+
+      // 화점 (화점 위치 3,3 점들)
+      const starPoints = [[2,2], [2,6], [6,2], [6,6], [4,4]];
+      starPoints.forEach(([r, c]) => {
+        ctx.fillStyle = "#333";
+        ctx.beginPath();
+        ctx.arc(PADDING + c * CELL_SIZE, PADDING + r * CELL_SIZE, 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // 돌 및 착수 유효 가이드 그리기
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          let x = PADDING + c * CELL_SIZE;
+          let y = PADDING + r * CELL_SIZE;
+
+          if (gameState.board[r][c] === 'B') {
+            drawStone(x, y, '#111');
+          } else if (gameState.board[r][c] === 'W') {
+            drawStone(x, y, '#fff');
+          } else {
+            // 내 차례일 때 가이드 점 표시
+            let isMyTurn = (mode === 'ai' && gameState.turn === 'B') || (mode === 'pvp' && gameState.turn === myColor);
+            if (isMyTurn) {
+              if (isValidMove(r, c, gameState.turn, gameState.board)) {
+                // AI 추천 수 강조
+                if (showHint && bestMove && bestMove.r === r && bestMove.c === c) {
+                  ctx.fillStyle = "rgba(241, 196, 15, 0.9)";
+                  ctx.beginPath();
+                  ctx.arc(x, y, 7, 0, Math.PI * 2);
+                  ctx.fill();
+                  ctx.strokeStyle = "#d35400";
+                  ctx.stroke();
+                } else {
+                  ctx.fillStyle = "rgba(46, 204, 113, 0.7)";
+                  ctx.beginPath();
+                  ctx.arc(x, y, 4, 0, Math.PI * 2);
+                  ctx.fill();
+                }
+              } else {
+                ctx.fillStyle = "rgba(231, 76, 60, 0.5)";
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.fill();
+              }
+            }
+          }
+        }
+      }
+    }
+
+    function drawStone(x, y, color) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, CELL_SIZE / 2 - 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#333";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // 터치/클릭 입력
+    canvas.addEventListener("click", (e) => {
+      let isMyTurn = (mode === 'ai' && gameState.turn === 'B') || (mode === 'pvp' && gameState.turn === myColor);
+      if (!isMyTurn) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      const c = Math.round((x - PADDING) / CELL_SIZE);
+      const r = Math.round((y - PADDING) / CELL_SIZE);
+
+      if (r >= 0 && r < SIZE && c >= 0 && c < SIZE) {
+        if (isValidMove(r, c, gameState.turn, gameState.board)) {
+          makeMove(r, c);
+        }
+      }
+    });
+
+    function makeMove(r, c) {
+      let current = gameState.turn;
+      let opponent = current === 'B' ? 'W' : 'B';
+
+      gameState.board[r][c] = current;
+      let captured = checkCaptures(r, c, opponent, gameState.board);
+
+      if (current === 'B') gameState.capturedB += captured;
+      else gameState.capturedW += captured;
+
+      gameState.turn = opponent;
+
+      if (mode === 'pvp' && roomId) {
+        db.ref("rooms/" + roomId + "/gameState").set(gameState);
+      } else {
+        drawBoard();
+        updateUI();
+
+        // 컴퓨터 차례 (AI 대진)
+        if (mode === 'ai' && gameState.turn === 'W') {
+          setTimeout(makeAIMove, 600);
+        } else if (showHint) {
+          calculateBestMove(gameState.turn);
+          drawBoard();
+        }
+      }
+    }
+
+    // AI 착수 로직 (알고리즘)
+    function makeAIMove() {
+      let best = evaluateAllMoves('W');
+      if (best) {
+        gameState.board[best.r][best.c] = 'W';
+        let captured = checkCaptures(best.r, best.c, 'B', gameState.board);
+        gameState.capturedW += captured;
+        gameState.turn = 'B';
+
+        if (showHint) calculateBestMove('B');
+        drawBoard();
+        updateUI();
+      }
+    }
+
+    // 추천 수 및 노하우 힌트 계산 Engine
+    function calculateBestMove(color) {
+      let move = evaluateAllMoves(color);
+      bestMove = move;
+      if (move) {
+        document.getElementById("hint-box").innerHTML = `💡 <b>AI 코치 추천:</b> [${move.r + 1}행, ${move.c + 1}열] 골드 점 위치!<br>➔ <i>${move.reason}</i>`;
+      }
+    }
+
+    // 모든 둘 수 있는 자리를 평가하여 최선의 착수 선정
+    function evaluateAllMoves(color) {
+      let candidateMoves = [];
+      let opponent = color === 'B' ? 'W' : 'B';
+
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (isValidMove(r, c, color, gameState.board)) {
+            let score = 0;
+            let reason = "영역을 확장하기 좋은 위치입니다.";
+
+            // 가상 보드
+            let testBoard = gameState.board.map(row => [...row]);
+            testBoard[r][c] = color;
+
+            // 1. 상대 돌 잡기 평가
+            let captured = 0;
+            const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+            dirs.forEach(([dr, dc]) => {
+              let nr = r + dr, nc = c + dc;
+              if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && testBoard[nr][nc] === opponent) {
+                if (getGroupLiberties(nr, nc, testBoard).size === 0) captured++;
+              }
+            });
+
+            if (captured > 0) {
+              score += 150 + captured * 20;
+              reason = `상대 돌(${captured}개)을 잡을 수 있는 절호의 기회입니다!`;
+            }
+
+            // 2. 귀/변 위치 가산점 (귀 > 변 > 중앙)
+            let isCorner = (r === 2 || r === 6) && (c === 2 || c === 6);
+            let isEdge = (r === 2 || r === 6 || c === 2 || c === 6);
+            if (isCorner) { score += 40; reason = "귀(모서리)는 집을 효율적으로 짓기 가장 좋은 땅입니다."; }
+            else if (isEdge) { score += 20; reason = "변(테두리)에 집을 넓히는 좋은 수입니다."; }
+
+            // 3. 내 활로 확보 점수
+            let libs = getGroupLiberties(r, c, testBoard).size;
+            score += libs * 5;
+
+            candidateMoves.push({ r, c, score, reason });
+          }
+        }
+      }
+
+      candidateMoves.sort((a, b) => b.score - a.score);
+      return candidateMoves.length > 0 ? candidateMoves[0] : null;
+    }
+
+    // 규칙 검사: 착수 가능 여부
+    function isValidMove(r, c, color, board) {
+      if (board[r][c] !== null) return false;
+
+      let nextBoard = board.map(row => [...row]);
+      nextBoard[r][c] = color;
+      let opponent = color === 'B' ? 'W' : 'B';
+
+      // 상대 돌을 잡을 수 있다면 무조건 가능
+      let captured = 0;
+      const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+      dirs.forEach(([dr, dc]) => {
+        let nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && nextBoard[nr][nc] === opponent) {
+          if (getGroupLiberties(nr, nc, nextBoard).size === 0) captured++;
+        }
+      });
+      if (captured > 0) return true;
+
+      // 자충수 (자신 활로가 0이면 불가능)
+      if (getGroupLiberties(r, c, nextBoard).size === 0) return false;
+
+      return true;
+    }
+
+    function checkCaptures(r, c, opponent, board) {
+      let totalCaptured = 0;
+      const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+      dirs.forEach(([dr, dc]) => {
+        let nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === opponent) {
+          if (getGroupLiberties(nr, nc, board).size === 0) {
+            totalCaptured += removeGroup(nr, nc, board, opponent);
+          }
+        }
+      });
+      return totalCaptured;
+    }
+
+    function getGroupLiberties(r, c, board) {
+      let color = board[r][c];
+      let visited = new Set();
+      let liberties = new Set();
+      let queue = [[r, c]];
+
+      while (queue.length > 0) {
+        let [cr, cc] = queue.pop();
+        let key = `${cr},${cc}`;
+        if (visited.has(key)) continue;
+        visited.add(key);
+
+        const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+        dirs.forEach(([dr, dc]) => {
+          let nr = cr + dr, nc = cc + dc;
+          if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE) {
+            if (board[nr][nc] === null) liberties.add(`${nr},${nc}`);
+            else if (board[nr][nc] === color && !visited.has(`${nr},${nc}`)) queue.push([nr, nc]);
+          }
+        });
+      }
+      return liberties;
+    }
+
+    function removeGroup(r, c, board, color) {
+      let count = 0;
+      let queue = [[r, c]];
+      board[r][c] = null;
+      count++;
+
+      while (queue.length > 0) {
+        let [cr, cc] = queue.pop();
+        const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+        dirs.forEach(([dr, dc]) => {
+          let nr = cr + dr, nc = cc + dc;
+          if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === color) {
+            board[nr][nc] = null;
+            count++;
+            queue.push([nr, nc]);
+          }
+        });
+      }
+      return count;
+    }
+
+    // 온라인 방 접속
+    function joinGame() {
+      roomId = document.getElementById("roomId").value.trim();
+      if (!roomId) return alert("방 이름을 입력하세요.");
+
+      const roomRef = db.ref("rooms/" + roomId);
+      roomRef.once("value", snapshot => {
+        if (!snapshot.exists()) {
+          myColor = 'B';
+          roomRef.set({ gameState: gameState, playerB: true });
+        } else {
+          myColor = 'W';
+          roomRef.update({ playerW: true });
+        }
+
+        roomRef.child("gameState").on("value", snap => {
+          if (snap.exists()) {
+            gameState = snap.val();
+            if(!gameState.board) gameState.board = Array(SIZE).fill(null).map(() => Array(SIZE).fill(null));
+            if (showHint) calculateBestMove(gameState.turn);
+            drawBoard();
+            updateUI();
+          }
+        });
+      });
+    }
+
+    function updateUI() {
+      document.getElementById('cap-b').innerText = gameState.capturedB || 0;
+      document.getElementById('cap-w').innerText = gameState.capturedW || 0;
+
+      let statusMsg = "";
+      if (mode === 'ai') {
+        statusMsg = gameState.turn === 'B' ? "내 차례입니다 (흑돌●)" : "컴퓨터가 생각 중입니다 (백돌○)...";
+      } else {
+        statusMsg = `내 돌: ${myColor === 'B' ? '흑돌●' : '백돌○'} | 차례: ${gameState.turn === 'B' ? '흑돌●' : '백돌○'}`;
+      }
+      document.getElementById('status-bar').innerText = statusMsg;
+    }
+
+    // 모달 컨트롤
+    function openModal() { document.getElementById('lessonModal').style.display = 'flex'; }
+    function closeModal() { document.getElementById('lessonModal').style.display = 'none'; }
+
+    init();
+  </script>
+</body>
+</html>
