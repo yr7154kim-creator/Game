@@ -3,14 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>초보자 맞춤형 2인용 & AI 바둑 교실</title>
+  <title>스마트 2인용 & AI 바둑 교실</title>
   <style>
     :root {
-      --board-color: #e4ab65;
+      --board-bg: #e4ab65;
       --bg-color: #f5f6fa;
       --primary-color: #2c3e50;
-      --accent-color: #e67e22;
-      --hint-color: #f1c40f;
     }
     * { box-sizing: border-box; }
     body {
@@ -20,11 +18,15 @@
       margin: 0;
       padding: 10px;
       color: #333;
+      transition: background 0.5s ease;
     }
-    header {
-      margin-bottom: 10px;
+   
+    /* 상대방 입장 시 화면 배경 전환 효과 */
+    body.connected {
+      background: #eef9f1; /* 은은한 연녹색 배경 */
     }
-    h1 { margin: 5px 0; font-size: 22px; color: var(--primary-color); }
+
+    header h1 { margin: 5px 0; font-size: 22px; color: var(--primary-color); }
    
     /* 모드 선택 탭 */
     .mode-selector {
@@ -41,7 +43,6 @@
       font-weight: bold;
       font-size: 13px;
       cursor: pointer;
-      transition: all 0.2s;
     }
     .mode-btn.active {
       background: var(--primary-color);
@@ -52,18 +53,17 @@
     /* 패널 및 상태 */
     .panel {
       background: #fff;
-      padding: 10px;
+      padding: 12px;
       border-radius: 10px;
-      margin-bottom: 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      margin: 0 auto 10px auto;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
       max-width: 420px;
-      margin-left: auto;
-      margin-right: auto;
     }
     .online-controls { display: flex; justify-content: center; gap: 5px; margin-bottom: 8px; }
-    input[type="text"] { padding: 6px 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; width: 140px; }
+    input[type="text"] { padding: 8px 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; width: 140px; }
+   
     button.action-btn {
-      padding: 6px 12px;
+      padding: 8px 14px;
       background: #3498db;
       color: white;
       border: none;
@@ -71,11 +71,24 @@
       font-weight: bold;
       cursor: pointer;
     }
+    button.action-btn:disabled { background: #95a5a6; }
+
+    /* 연결 상태 뱃지 */
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+    .badge-waiting { background: #ffeaa7; color: #d35400; }
+    .badge-connected { background: #2ecc71; color: white; }
 
     #status-bar {
       font-size: 14px;
       font-weight: 600;
-      margin: 5px 0;
+      margin: 6px 0;
       min-height: 20px;
     }
     #score-board {
@@ -87,21 +100,31 @@
       border-radius: 6px;
     }
 
-    /* 바둑판 테두리 */
+    /* 바둑판 테두리 및 연결 시 연출 */
     #board-wrapper {
       display: inline-block;
       position: relative;
-      background: var(--board-color);
+      background: var(--board-bg);
       padding: 15px;
       border-radius: 12px;
       box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+      transition: all 0.5s ease;
       touch-action: manipulation;
     }
-    canvas { background: var(--board-color); cursor: pointer; display: block; }
+    #board-wrapper.waiting {
+      filter: opacity(0.85);
+      border: 3px dashed #e67e22;
+    }
+    #board-wrapper.ready {
+      filter: opacity(1);
+      border: 3px solid #2ecc71;
+      box-shadow: 0 0 15px rgba(46, 204, 113, 0.4);
+    }
+    canvas { background: var(--board-bg); cursor: pointer; display: block; }
 
-    /* 가이드 메시지 및 힌트 */
+    /* 가이드 및 힌트 */
     #hint-box {
-      margin-top: 8px;
+      margin: 8px auto 0 auto;
       background: #fffde7;
       border: 1px solid #ffe082;
       padding: 8px;
@@ -109,12 +132,10 @@
       font-size: 13px;
       color: #795548;
       max-width: 420px;
-      margin-left: auto;
-      margin-right: auto;
       text-align: left;
     }
 
-    /* 하단 버튼 및 가이드 레전드 */
+    /* 버튼 및 레전드 */
     .controls-bottom {
       margin-top: 10px;
       display: flex;
@@ -144,7 +165,7 @@
     }
     .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; }
 
-    /* 모달 팝업 (바둑 노하우 학습) */
+    /* 바둑 노하우 모달 */
     .modal {
       display: none;
       position: fixed;
@@ -174,7 +195,7 @@
 <body>
 
   <header>
-    <h1>📱 스마트 바둑 교실 & 대진</h1>
+    <h1>📱 스마트 2인용 & AI 바둑 교실</h1>
   </header>
 
   <!-- 게임 모드 선택 -->
@@ -184,16 +205,21 @@
   </div>
 
   <div class="panel">
-    <!-- 온라인 접속용 UI (PVP 모드 시 노출) -->
+    <!-- 온라인 접속용 UI -->
     <div id="pvp-controls" class="online-controls" style="display: none;">
       <input type="text" id="roomId" placeholder="방 이름 (예: love123)">
-      <button class="action-btn" onclick="joinGame()">방 접속</button>
+      <button class="action-btn" id="join-btn" onclick="joinGame()">방 접속</button>
+    </div>
+
+    <!-- 접속 상태 알림 뱃지 -->
+    <div id="connection-badge" class="status-badge badge-waiting" style="display: none;">
+      ⌛ 상대방 대기 중
     </div>
 
     <div id="status-bar">모드를 선택하고 게임을 시작하세요.</div>
     <div id="score-board">
-      <span>흑(●) 사석: <b id="cap-b">0</b> | 집: <b id="territory-b">0</b></span>
-      <span>백(○) 사석: <b id="cap-w">0</b> | 집: <b id="territory-w">0</b></span>
+      <span>흑(●) 사석: <b id="cap-b">0</b></span>
+      <span>백(○) 사석: <b id="cap-w">0</b></span>
     </div>
   </div>
 
@@ -211,7 +237,7 @@
 
   <!-- 힌트 안내 박스 -->
   <div id="hint-box">
-    💡 <b>AI 코치 팁:</b> [힌트 켜기]를 누르면 좋은 착수 위치와 바둑 노하우를 안내해 드립니다!
+    💡 <b>AI 코치 팁:</b> [힌트 켜기]를 누르면 좋은 착수 위치와 노하우를 알려드립니다!
   </div>
 
   <!-- 기능 버튼 -->
@@ -221,29 +247,24 @@
     <button class="sub-btn reset-btn" onclick="resetGame()">🔄 새 게임</button>
   </div>
 
-  <!-- 초보자 바둑 노하우 모달 -->
+  <!-- 바둑 노하우 모달 -->
   <div class="modal" id="lessonModal">
     <div class="modal-content">
       <h2>🎓 초보자를 위한 바둑 핵심 노하우</h2>
      
       <div class="lesson-item">
         <h4>1. 집 짓기 우선순위 (귀 ➔ 변 ➔ 중앙)</h4>
-        <p>바둑은 땅(집)을 넓게 만드는 사람이 이깁니다. 구석(귀)은 돌 4개만 써도 집을 쉽게 만들지만, 중앙은 돌이 8개 이상 필요합니다. **모서리부터 먼저 차지하세요!**</p>
+        <p>구석(귀)은 적은 돌로 가장 넓은 땅을 만들 수 있습니다. 모서리부터 차근차근 땅을 늘려가세요!</p>
       </div>
 
       <div class="lesson-item">
         <h4>2. 활로(길)와 단수</h4>
-        <p>돌의 상하좌우 선을 '활로'라고 합니다. 상대가 내 활로를 모두 막으면 돌이 잡힙니다. 활로가 딱 1개 남은 상태를 **'단수'**라고 하며, 이 때는 즉시 도망쳐야 합니다!</p>
+        <p>돌의 상하좌우 길(활로)이 하나만 남으면 **'단수'** 상태입니다. 상대가 잡기 전에 즉시 이어 도망치세요!</p>
       </div>
 
       <div class="lesson-item">
         <h4>3. 두 눈(Eye) 만들어서 살기</h4>
-        <p>상대방이 절대 들어올 수 없는 완전한 내 독립 공간 2개(두 눈)를 만들면 그 돌은 절대로 잡히지 않는 **'불사의 돌'**이 됩니다.</p>
-      </div>
-
-      <div class="lesson-item">
-        <h4>4. 연결과 끊기</h4>
-        <p>내 돌들이 튼튼하게 일직선으로 연결되어 있으면 강해지고, 흩어지면 약해집니다. 상대 돌의 연결 부위를 끊거나 내 돌을 튼튼히 연결하는 것이 승리의 열쇠입니다.</p>
+        <p>독립된 2개의 공간(두 눈)을 확보하면 그 돌들은 절대로 잡히지 않는 '완전한 생사'가 됩니다.</p>
       </div>
 
       <button class="close-btn" onclick="closeModal()">이해했습니다! (닫기)</button>
@@ -255,24 +276,58 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
   <script>
-    // Firebase 공용 DB 설정
+    // 🔊 웹 오디오 사운드 효과음 생성기 (사운드 파일 없이 작동)
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function playSound(type) {
+      if (!audioCtx) audioCtx = new AudioContext();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      if (type === 'stone') {
+        // 돌 놓는 소리 (짧은 목탁 느낌의 착수음)
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.08);
+        gain.gain.setValueAtTime(1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.08);
+      } else if (type === 'join') {
+        // 입장 알림음 (띵동)
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.15); // E5
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.5);
+      }
+    }
+
+    // Firebase DB 설정
     const firebaseConfig = { databaseURL: "https://goban-online-default-rtdb.firebaseio.com/" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    const SIZE = 9; // 초보용 9x9 판
+    const SIZE = 9;
     const CELL_SIZE = 34;
     const PADDING = 17;
 
     let canvas = document.getElementById("goBoard");
     let ctx = canvas.getContext("2d");
 
-    let mode = 'ai'; // 'ai' 또는 'pvp'
+    let mode = 'ai';
     let showHint = true;
     let roomId = "";
-    let myColor = 'B'; // 'B': 흑, 'W': 백
+    let myColor = 'B';
     let bestMove = null;
-    let hintMessage = "";
+    let opponentJoined = false;
 
     let gameState = {
       board: Array(SIZE).fill(null).map(() => Array(SIZE).fill(null)),
@@ -281,11 +336,10 @@
       capturedW: 0
     };
 
-    // 초기화
     function init() {
       drawBoard();
       updateUI();
-      if(mode === 'ai' && gameState.turn === myColor && showHint) {
+      if(mode === 'ai' && gameState.turn === 'B' && showHint) {
         calculateBestMove('B');
       }
     }
@@ -295,6 +349,11 @@
       document.getElementById('btn-ai').classList.toggle('active', mode === 'ai');
       document.getElementById('btn-pvp').classList.toggle('active', mode === 'pvp');
       document.getElementById('pvp-controls').style.display = mode === 'pvp' ? 'flex' : 'none';
+      document.getElementById('connection-badge').style.display = mode === 'pvp' ? 'inline-block' : 'none';
+     
+      document.body.classList.remove('connected');
+      document.getElementById('board-wrapper').className = '';
+
       resetGame();
     }
 
@@ -316,14 +375,16 @@
         capturedB: 0,
         capturedW: 0
       };
-      myColor = 'B';
       bestMove = null;
-      if(showHint) calculateBestMove('B');
-      drawBoard();
-      updateUI();
+      if (mode === 'pvp' && roomId) {
+        db.ref("rooms/" + roomId + "/gameState").set(gameState);
+      } else {
+        if(showHint) calculateBestMove('B');
+        drawBoard();
+        updateUI();
+      }
     }
 
-    // 바둑판 그리기
     function drawBoard() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
      
@@ -342,7 +403,7 @@
         ctx.stroke();
       }
 
-      // 화점 (화점 위치 3,3 점들)
+      // 화점
       const starPoints = [[2,2], [2,6], [6,2], [6,6], [4,4]];
       starPoints.forEach(([r, c]) => {
         ctx.fillStyle = "#333";
@@ -351,7 +412,7 @@
         ctx.fill();
       });
 
-      // 돌 및 착수 유효 가이드 그리기
+      // 돌 및 착수 가이드 그리기
       for (let r = 0; r < SIZE; r++) {
         for (let c = 0; c < SIZE; c++) {
           let x = PADDING + c * CELL_SIZE;
@@ -362,11 +423,9 @@
           } else if (gameState.board[r][c] === 'W') {
             drawStone(x, y, '#fff');
           } else {
-            // 내 차례일 때 가이드 점 표시
             let isMyTurn = (mode === 'ai' && gameState.turn === 'B') || (mode === 'pvp' && gameState.turn === myColor);
             if (isMyTurn) {
               if (isValidMove(r, c, gameState.turn, gameState.board)) {
-                // AI 추천 수 강조
                 if (showHint && bestMove && bestMove.r === r && bestMove.c === c) {
                   ctx.fillStyle = "rgba(241, 196, 15, 0.9)";
                   ctx.beginPath();
@@ -402,7 +461,7 @@
       ctx.stroke();
     }
 
-    // 터치/클릭 입력
+    // 클릭 이벤트
     canvas.addEventListener("click", (e) => {
       let isMyTurn = (mode === 'ai' && gameState.turn === 'B') || (mode === 'pvp' && gameState.turn === myColor);
       if (!isMyTurn) return;
@@ -422,6 +481,8 @@
     });
 
     function makeMove(r, c) {
+      playSound('stone'); // 🔊 착수음 재생
+
       let current = gameState.turn;
       let opponent = current === 'B' ? 'W' : 'B';
 
@@ -439,7 +500,6 @@
         drawBoard();
         updateUI();
 
-        // 컴퓨터 차례 (AI 대진)
         if (mode === 'ai' && gameState.turn === 'W') {
           setTimeout(makeAIMove, 600);
         } else if (showHint) {
@@ -449,10 +509,10 @@
       }
     }
 
-    // AI 착수 로직 (알고리즘)
     function makeAIMove() {
       let best = evaluateAllMoves('W');
       if (best) {
+        playSound('stone'); // 🔊 AI 착수음
         gameState.board[best.r][best.c] = 'W';
         let captured = checkCaptures(best.r, best.c, 'B', gameState.board);
         gameState.capturedW += captured;
@@ -464,7 +524,6 @@
       }
     }
 
-    // 추천 수 및 노하우 힌트 계산 Engine
     function calculateBestMove(color) {
       let move = evaluateAllMoves(color);
       bestMove = move;
@@ -473,7 +532,6 @@
       }
     }
 
-    // 모든 둘 수 있는 자리를 평가하여 최선의 착수 선정
     function evaluateAllMoves(color) {
       let candidateMoves = [];
       let opponent = color === 'B' ? 'W' : 'B';
@@ -482,13 +540,11 @@
         for (let c = 0; c < SIZE; c++) {
           if (isValidMove(r, c, color, gameState.board)) {
             let score = 0;
-            let reason = "영역을 확장하기 좋은 위치입니다.";
+            let reason = "영역을 넓히기 좋은 자리입니다.";
 
-            // 가상 보드
             let testBoard = gameState.board.map(row => [...row]);
             testBoard[r][c] = color;
 
-            // 1. 상대 돌 잡기 평가
             let captured = 0;
             const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
             dirs.forEach(([dr, dc]) => {
@@ -500,16 +556,14 @@
 
             if (captured > 0) {
               score += 150 + captured * 20;
-              reason = `상대 돌(${captured}개)을 잡을 수 있는 절호의 기회입니다!`;
+              reason = `상대 돌(${captured}개)을 잡을 수 있습니다!`;
             }
 
-            // 2. 귀/변 위치 가산점 (귀 > 변 > 중앙)
             let isCorner = (r === 2 || r === 6) && (c === 2 || c === 6);
             let isEdge = (r === 2 || r === 6 || c === 2 || c === 6);
-            if (isCorner) { score += 40; reason = "귀(모서리)는 집을 효율적으로 짓기 가장 좋은 땅입니다."; }
-            else if (isEdge) { score += 20; reason = "변(테두리)에 집을 넓히는 좋은 수입니다."; }
+            if (isCorner) { score += 40; reason = "귀(모서리)는 집을 짓기 가장 좋은 땅입니다."; }
+            else if (isEdge) { score += 20; reason = "변에 집을 구축하기 유리합니다."; }
 
-            // 3. 내 활로 확보 점수
             let libs = getGroupLiberties(r, c, testBoard).size;
             score += libs * 5;
 
@@ -522,7 +576,6 @@
       return candidateMoves.length > 0 ? candidateMoves[0] : null;
     }
 
-    // 규칙 검사: 착수 가능 여부
     function isValidMove(r, c, color, board) {
       if (board[r][c] !== null) return false;
 
@@ -530,7 +583,6 @@
       nextBoard[r][c] = color;
       let opponent = color === 'B' ? 'W' : 'B';
 
-      // 상대 돌을 잡을 수 있다면 무조건 가능
       let captured = 0;
       const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
       dirs.forEach(([dr, dc]) => {
@@ -541,7 +593,6 @@
       });
       if (captured > 0) return true;
 
-      // 자충수 (자신 활로가 0이면 불가능)
       if (getGroupLiberties(r, c, nextBoard).size === 0) return false;
 
       return true;
@@ -606,25 +657,76 @@
       return count;
     }
 
-    // 온라인 방 접속
+    // 🌐 온라인 방 접속 및 실시간 동기화 강화
     function joinGame() {
       roomId = document.getElementById("roomId").value.trim();
       if (!roomId) return alert("방 이름을 입력하세요.");
 
+      let btn = document.getElementById("join-btn");
+      btn.innerText = "⏳ 접속 중...";
+      btn.disabled = true;
+
       const roomRef = db.ref("rooms/" + roomId);
+     
       roomRef.once("value", snapshot => {
+        let roomData = snapshot.val();
+
         if (!snapshot.exists()) {
+          // 1번 접속자: 흑돌 지정
           myColor = 'B';
-          roomRef.set({ gameState: gameState, playerB: true });
+          roomRef.set({
+            gameState: gameState,
+            playerB: true,
+            playerW: false
+          });
         } else {
+          // 2번 접속자: 백돌 지정 및 접속 완료 알림
           myColor = 'W';
           roomRef.update({ playerW: true });
         }
 
+        btn.innerText = "✅ 입장 완료";
+
+        // 방 접속 상태 감지 (상대방 들어왔는지 확인)
+        roomRef.on("value", snap => {
+          let val = snap.val();
+          if (!val) return;
+
+          let hasBoth = val.playerB && val.playerW;
+
+          if (hasBoth && !opponentJoined) {
+            opponentJoined = true;
+            playSound('join'); // 🔊 상대방 입장 효과음!
+           
+            // 시각적 연출: 화면 및 바둑판 배경 전환
+            document.body.classList.add('connected');
+            document.getElementById('board-wrapper').className = 'ready';
+           
+            let badge = document.getElementById('connection-badge');
+            badge.className = 'status-badge badge-connected';
+            badge.innerText = '🟢 대결 상대 연결됨';
+
+            alert("🎉 상대방이 방에 입장했습니다! 대결을 시작합니다.");
+          } else if (!hasBoth) {
+            document.getElementById('board-wrapper').className = 'waiting';
+            let badge = document.getElementById('connection-badge');
+            badge.className = 'status-badge badge-waiting';
+            badge.innerText = '⌛ 상대방 입장 대기 중...';
+          }
+        });
+
+        // 착수 데이터 실시간 동기화
         roomRef.child("gameState").on("value", snap => {
           if (snap.exists()) {
+            let prevTurn = gameState.turn;
             gameState = snap.val();
             if(!gameState.board) gameState.board = Array(SIZE).fill(null).map(() => Array(SIZE).fill(null));
+           
+            // 상대방이 뒀을 때 착수음 재생
+            if (prevTurn !== gameState.turn && gameState.turn === myColor) {
+              playSound('stone');
+            }
+
             if (showHint) calculateBestMove(gameState.turn);
             drawBoard();
             updateUI();
@@ -641,12 +743,13 @@
       if (mode === 'ai') {
         statusMsg = gameState.turn === 'B' ? "내 차례입니다 (흑돌●)" : "컴퓨터가 생각 중입니다 (백돌○)...";
       } else {
-        statusMsg = `내 돌: ${myColor === 'B' ? '흑돌●' : '백돌○'} | 차례: ${gameState.turn === 'B' ? '흑돌●' : '백돌○'}`;
+        let turnText = gameState.turn === 'B' ? '흑돌●' : '백돌○';
+        let myText = myColor === 'B' ? '흑돌●' : '백돌○';
+        statusMsg = `내 돌: ${myText} | 현재 차례: ${turnText}`;
       }
       document.getElementById('status-bar').innerText = statusMsg;
     }
 
-    // 모달 컨트롤
     function openModal() { document.getElementById('lessonModal').style.display = 'flex'; }
     function closeModal() { document.getElementById('lessonModal').style.display = 'none'; }
 
